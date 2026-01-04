@@ -6,3 +6,4 @@ en:
     amazon_sns_region: "Enter the AWS region for your SNS Push Notification service, e.g. 'us-east-1'."
     amazon_sns_apns_application_arn: "Enter the ARN for a platform application you have created for Apple iOS."
     amazon_sns_gcm_application_arn: "Enter the ARN for a platform application you have created for Google's Firebase Cloud Messaging (FCM)."
+    amazon_sns_data_only: "Send title and body values in the data block rather than the notification block."

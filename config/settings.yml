@@ -12,3 +12,4 @@ plugins:
     default: ""
   amazon_sns_gcm_application_arn:
     default: ""
+  amazon_sns_data_only: false

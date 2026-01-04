@@ -19,6 +19,7 @@ RSpec.describe AmazonSnsHelper do
     SiteSetting.amazon_sns_access_key_id = "access_key_id"
     SiteSetting.amazon_sns_secret_access_key = "secret_key"
     SiteSetting.amazon_sns_apns_application_arn = "test_apple_arn"
+    SiteSetting.amazon_sns_data_only = false
   end
 
   context "when the SNS endpoint has been disabled" do
@@ -68,7 +69,7 @@ RSpec.describe AmazonSnsHelper do
     end
   end
 
-  describe "publish_android" do
+  describe "publish_android when amazon_sns_data_only is false" do
     let(:client) { Aws::SNS::Client.new(stub_responses: true) }
 
     before do
@@ -129,6 +130,77 @@ RSpec.describe AmazonSnsHelper do
             notification: {
               title: "Topic Title",
               body: "@username: Excerpt",
+            },
+          }.to_json,
+        }.to_json
+
+        expect(client).to have_received(:publish).with(
+          target_arn: test_arn,
+          message: expected_message,
+          message_structure: "json",
+        )
+      end
+    end
+  end
+
+  describe "publish_android when amazon_sns_data_only is true" do
+    let(:client) { Aws::SNS::Client.new(stub_responses: true) }
+
+    before do
+      allow(described_class).to receive(:sns_client).and_return(client)
+      allow(client).to receive(:publish).and_return(mock_response)
+      SiteSetting.amazon_sns_data_only = true
+    end
+
+    context "when use_title_and_body is true" do
+      let(:payload) do
+        { use_title_and_body: true, title: "Test Title", body: "Test Body", post_url: "/test/url" }
+      end
+
+      it "uses title and body directly" do
+        described_class.publish_android(user, test_arn, payload)
+
+        expected_message = {
+          gcm: {
+            data: {
+              title: "Test Title",
+              body: "Test Body",
+              message: "Test Body",
+              url: "#{Discourse.base_url_no_prefix}/test/url",
+            },
+          }.to_json,
+        }.to_json
+
+        expect(client).to have_received(:publish).with(
+          target_arn: test_arn,
+          message: expected_message,
+          message_structure: "json",
+        )
+      end
+    end
+
+    context "when use_title_and_body is false" do
+      let(:payload) do
+        {
+          topic_title: "Topic Title",
+          username: "username",
+          excerpt: "Excerpt",
+          post_url: "/test/url",
+        }
+      end
+
+      it "generates a message using topic title and excerpt" do
+        allow(described_class).to receive(:generate_message).and_return("@username: Excerpt")
+
+        described_class.publish_android(user, test_arn, payload)
+
+        expected_message = {
+          gcm: {
+            data: {
+              title: "Topic Title",
+              body: "@username: Excerpt",
+              message: "@username: Excerpt",
+              url: "#{Discourse.base_url_no_prefix}/test/url",
             },
           }.to_json,
         }.to_json

@@ -88,34 +88,29 @@ class AmazonSnsHelper
     end
   end
 
+  def self.construct_android_notification(title, body, message, url)
+    if SiteSetting.amazon_sns_data_only
+      { data: { title: title, body: body, message: message, url: url } }
+    else
+      { data: { message: message, url: url }, notification: { title: title, body: body } }
+    end
+  end
+
   def self.publish_android(user, target_arn, payload)
     url = "#{Discourse.base_url_no_prefix}#{payload[:post_url]}"
 
     android_notification =
       if payload[:use_title_and_body]
-        {
-          data: {
-            message: payload[:body],
-            url: url,
-          },
-          notification: {
-            title: payload[:title],
-            body: payload[:body],
-          },
-        }
+        self.construct_android_notification(payload[:title], payload[:body], payload[:body], url)
       else
         message = generate_message(payload, user)
 
-        {
-          data: {
-            message: message,
-            url: url,
-          },
-          notification: {
-            title: payload[:topic_title] || payload[:translated_title],
-            body: message,
-          },
-        }
+        self.construct_android_notification(
+          payload[:topic_title] || payload[:translated_title],
+          message,
+          message,
+          url,
+        )
       end
 
     sns_payload = { gcm: android_notification.to_json }
@@ -190,16 +185,13 @@ class AmazonSnsHelper
   def self.test_publish_android
     target_arn =
       "arn:aws:sns:us-east-1:987654321098:endpoint/GCM/AndroidTest/f6d9c22c-3093-11ee-be56-0242ac120002"
-    android_notification = {
-      data: {
-        message: "@user1: Hey there Android dude",
-        url: "http://www.example.com",
-      },
-      notification: {
-        title: "Notification title",
-        body: "@user1: Hey there Android dude not. body",
-      },
-    }
+    android_notification =
+      self.construct_android_notification(
+        "Notification title",
+        "@user1: Hey there Android dude not. body",
+        "@user1: Hey there Android dude",
+        "http://www.example.com",
+      )
 
     sns_payload = { gcm: android_notification.to_json }
 
