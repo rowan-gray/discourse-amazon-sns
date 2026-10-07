@@ -88,20 +88,37 @@ class AmazonSnsHelper
     end
   end
 
-  def self.construct_android_notification(title, body, message, url)
+  def self.construct_android_notification(title, body, message, url, extra_data = {})
     if SiteSetting.amazon_sns_data_only
-      { data: { title: title, body: body, message: message, url: url } }
+      { data: { title: title, body: body, message: message, url: url, **extra_data } }
     else
-      { data: { message: message, url: url }, notification: { title: title, body: body } }
+      {
+        data: {
+          message: message,
+          url: url,
+          **extra_data,
+        },
+        notification: {
+          title: title,
+          body: body,
+        },
+      }
     end
   end
 
   def self.publish_android(user, target_arn, payload)
     url = "#{Discourse.base_url_no_prefix}#{payload[:post_url]}"
+    category_data = android_category_data(payload)
 
     android_notification =
       if payload[:use_title_and_body]
-        self.construct_android_notification(payload[:title], payload[:body], payload[:body], url)
+        self.construct_android_notification(
+          payload[:title],
+          payload[:body],
+          payload[:body],
+          url,
+          category_data,
+        )
       else
         message = generate_message(payload, user)
 
@@ -110,6 +127,7 @@ class AmazonSnsHelper
           message,
           message,
           url,
+          category_data,
         )
       end
 
@@ -134,6 +152,23 @@ class AmazonSnsHelper
         destroy_arn_subscriptions(target_arn)
       end
     end
+  end
+
+  # Lets the app sort notifications into channels (topics, direct messages,
+  # chat, ...). FCM data values must be strings.
+  def self.android_category_data(payload)
+    {
+      notification_type: Notification.types.key(payload[:notification_type]).to_s,
+      direct_message: direct_message?(payload).to_s,
+    }
+  end
+
+  # Personal messages and chat direct messages
+  def self.direct_message?(payload)
+    return payload[:is_direct_message_channel] == true if payload.key?(:is_direct_message_channel)
+
+    payload[:topic_id].present? &&
+      Topic.where(id: payload[:topic_id], archetype: Archetype.private_message).exists?
   end
 
   def self.generate_message(payload, user)

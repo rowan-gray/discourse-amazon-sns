@@ -90,6 +90,8 @@ RSpec.describe AmazonSnsHelper do
             data: {
               message: "Test Body",
               url: "#{Discourse.base_url_no_prefix}/test/url",
+              notification_type: "",
+              direct_message: "false",
             },
             notification: {
               title: "Test Title",
@@ -126,6 +128,8 @@ RSpec.describe AmazonSnsHelper do
             data: {
               message: "@username: Excerpt",
               url: "#{Discourse.base_url_no_prefix}/test/url",
+              notification_type: "",
+              direct_message: "false",
             },
             notification: {
               title: "Topic Title",
@@ -167,6 +171,8 @@ RSpec.describe AmazonSnsHelper do
               body: "Test Body",
               message: "Test Body",
               url: "#{Discourse.base_url_no_prefix}/test/url",
+              notification_type: "",
+              direct_message: "false",
             },
           }.to_json,
         }.to_json
@@ -201,6 +207,8 @@ RSpec.describe AmazonSnsHelper do
               body: "@username: Excerpt",
               message: "@username: Excerpt",
               url: "#{Discourse.base_url_no_prefix}/test/url",
+              notification_type: "",
+              direct_message: "false",
             },
           }.to_json,
         }.to_json
@@ -211,6 +219,87 @@ RSpec.describe AmazonSnsHelper do
           message_structure: "json",
         )
       end
+    end
+  end
+
+  describe "publish_android category data" do
+    let(:client) { Aws::SNS::Client.new(stub_responses: true) }
+
+    fab!(:topic)
+    fab!(:private_message_topic)
+
+    before { allow(described_class).to receive(:sns_client).and_return(client) }
+
+    def published_data(payload)
+      data = nil
+      allow(client).to receive(:publish) do |args|
+        data = JSON.parse(JSON.parse(args[:message])["gcm"])["data"]
+        mock_response
+      end
+      described_class.publish_android(user, test_arn, payload)
+      data
+    end
+
+    it "marks replies in a regular topic as not direct messages" do
+      data =
+        published_data(
+          notification_type: Notification.types[:replied],
+          topic_id: topic.id,
+          post_url: "/t/#{topic.slug}/#{topic.id}/2",
+        )
+
+      expect(data).to include("notification_type" => "replied", "direct_message" => "false")
+    end
+
+    it "marks personal messages as direct messages" do
+      data =
+        published_data(
+          notification_type: Notification.types[:private_message],
+          topic_id: private_message_topic.id,
+          post_url: "/t/#{private_message_topic.slug}/#{private_message_topic.id}",
+        )
+
+      expect(data).to include("notification_type" => "private_message", "direct_message" => "true")
+    end
+
+    it "marks chat direct message channels as direct messages" do
+      data =
+        published_data(
+          notification_type: Notification.types[:chat_message],
+          is_direct_message_channel: true,
+          post_url: "/chat/c/-/1/2",
+        )
+
+      expect(data).to include("notification_type" => "chat_message", "direct_message" => "true")
+    end
+
+    it "marks public chat channels as not direct messages" do
+      data =
+        published_data(
+          notification_type: Notification.types[:chat_mention],
+          is_direct_message_channel: false,
+          post_url: "/chat/c/general/1/2",
+        )
+
+      expect(data).to include("notification_type" => "chat_mention", "direct_message" => "false")
+    end
+
+    it "includes the category data in data-only messages" do
+      SiteSetting.amazon_sns_data_only = true
+
+      data =
+        published_data(
+          notification_type: Notification.types[:replied],
+          topic_id: topic.id,
+          topic_title: "Topic Title",
+          post_url: "/t/#{topic.slug}/#{topic.id}/2",
+        )
+
+      expect(data).to include(
+        "title" => "Topic Title",
+        "notification_type" => "replied",
+        "direct_message" => "false",
+      )
     end
   end
 end
