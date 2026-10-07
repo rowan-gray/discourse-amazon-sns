@@ -174,6 +174,7 @@ RSpec.describe AmazonSnsHelper do
               notification_type: "",
               direct_message: "false",
             },
+            priority: "high",
           }.to_json,
         }.to_json
 
@@ -210,6 +211,7 @@ RSpec.describe AmazonSnsHelper do
               notification_type: "",
               direct_message: "false",
             },
+            priority: "high",
           }.to_json,
         }.to_json
 

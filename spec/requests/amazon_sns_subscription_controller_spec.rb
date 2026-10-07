@@ -12,7 +12,6 @@ RSpec.describe AmazonSnsSubscriptionController do
     SiteSetting.amazon_sns_access_key_id = "access_key_id"
     SiteSetting.amazon_sns_secret_access_key = "secret_key"
     SiteSetting.amazon_sns_apns_application_arn = "test_apple_arn"
-    SiteSetting.amazon_sns_data_only = false
 
     Aws.config[:sns] = {
       stub_responses: {

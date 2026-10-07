@@ -90,7 +90,18 @@ class AmazonSnsHelper
 
   def self.construct_android_notification(title, body, message, url, extra_data = {})
     if SiteSetting.amazon_sns_data_only
-      { data: { title: title, body: body, message: message, url: url, **extra_data } }
+      # FCM sends data-only messages at normal priority by default, which Android
+      # can hold back for minutes while the device is idle
+      {
+        data: {
+          title: title,
+          body: body,
+          message: message,
+          url: url,
+          **extra_data,
+        },
+        priority: "high",
+      }
     else
       {
         data: {
